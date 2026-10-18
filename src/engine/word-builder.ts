@@ -328,9 +328,7 @@ export const measureAndApplyWordMasks = (
     for (let j = 0; j < lineMeasurements.length; j++) {
       const m = lineMeasurements[j];
       const el = m.element;
-      const padding = el.classList.contains("lp-emp-wrapper")
-        ? Number.parseFloat(getComputedStyle(el).paddingLeft) || 0
-        : 0;
+      const padding = Number.parseFloat(getComputedStyle(el).paddingLeft) || 0;
       paddings[i][j] = padding;
       m.width = (el.clientWidth || 1) - padding * 2;
       m.fadeWidth = ((el.clientHeight || 16) - padding * 2) * fadeRatio;
