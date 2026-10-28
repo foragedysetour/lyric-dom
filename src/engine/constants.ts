@@ -38,6 +38,8 @@ export const DEFAULTS = {
   emphasizeMinDuration: 1000,
   /** 是否启用歌词缩放效果（开启时非激活行轻微缩小） */
   enableScale: true,
+  /** 是否对超长行做平衡换行 */
+  enableBalancedWrap: true,
   /** 是否显示翻译歌词 */
   showTranslation: true,
   /** 是否显示音译歌词 */

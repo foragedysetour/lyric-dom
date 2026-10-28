@@ -17,6 +17,7 @@ import {
   renderInterludeDots,
 } from "./interlude";
 import { LineAnimationController } from "./line-animations";
+import { balanceLineBreaks, clearLineBreaks } from "./line-balance";
 import { buildLineElements } from "./line-builder";
 import { Spring } from "./spring";
 import {
@@ -24,6 +25,9 @@ import {
   type WordAnimTarget,
   type WordMeasurement,
 } from "./word-builder";
+
+/** 屏外行平衡换行每帧处理的行数，每次重排有固定开销，宜大批少次 */
+const BALANCE_BATCH_SIZE = 32;
 
 export type { RendererConfig } from "../types";
 
@@ -122,6 +126,13 @@ export class LyricRenderer {
   private animationFrameId = 0;
   /** 掩码计算延迟 rAF 句柄 */
   private maskRafId = 0;
+  /** 待平衡换行的屏外行下标，按与激活行的距离排列 */
+  private balanceQueue: number[] = [];
+  /** 已写入换行、待下一帧校验行高的行下标 */
+  private balancePending: number[] = [];
+  /** 待校验的一批行高变化时的重排回调 */
+  private balancePendingChanged: () => void = () => {};
+  private balanceRafId = 0;
   /** 上一帧时间戳，用于计算 deltaTime */
   private lastFrameTimestamp = 0;
   /** 页面是否可见 */
@@ -191,6 +202,8 @@ export class LyricRenderer {
   private enableEmphasizeEffect = DEFAULTS.enableEmphasizeEffect;
   /** 是否启用歌词缩放效果 */
   private enableScale = DEFAULTS.enableScale;
+  /** 是否对超长行做平衡换行 */
+  private enableBalancedWrap = DEFAULTS.enableBalancedWrap;
   /** 是否显示翻译歌词 */
   private showTranslation = DEFAULTS.showTranslation;
   /** 是否显示音译歌词 */
@@ -319,6 +332,7 @@ export class LyricRenderer {
   dispose = () => {
     cancelAnimationFrame(this.animationFrameId);
     cancelAnimationFrame(this.maskRafId);
+    cancelAnimationFrame(this.balanceRafId);
     clearTimeout(this.scrollResetTimerId);
     this.lineAnimations.cancelAll();
     this.containerResizeObserver.disconnect();
@@ -481,6 +495,7 @@ export class LyricRenderer {
     }
     this.syncBgProgress();
     this.calculateLayout(true);
+    this.scheduleBalance(() => this.calculateLayout(true));
     this.playEntranceAnimation(this.containerHeight * 0.6);
     this.needsFullSync = true;
   };
@@ -580,6 +595,13 @@ export class LyricRenderer {
     if (config.enableScale != null && config.enableScale !== this.enableScale) {
       this.enableScale = config.enableScale;
       layoutDirty = true;
+    }
+    if (
+      config.enableBalancedWrap != null &&
+      config.enableBalancedWrap !== this.enableBalancedWrap
+    ) {
+      this.enableBalancedWrap = config.enableBalancedWrap;
+      domRebuildNeeded = true;
     }
     if (config.showTranslation != null && config.showTranslation !== this.showTranslation) {
       this.showTranslation = config.showTranslation;
@@ -765,6 +787,7 @@ export class LyricRenderer {
     this.snapVisualState();
     // 平滑重算布局
     this.calculateLayout(false);
+    this.scheduleBalance(() => this.calculateLayout(false));
     this.needsFullSync = true;
   };
 
@@ -1462,17 +1485,16 @@ export class LyricRenderer {
     const newWidth = this.container.clientWidth;
     const newHeight = this.container.clientHeight;
     if (newWidth === this.containerWidth && newHeight === this.containerHeight) return;
+    const widthChanged = newWidth !== this.containerWidth;
     this.containerWidth = newWidth;
     this.containerHeight = newHeight;
+    if (widthChanged) clearLineBreaks(this.lineElements);
     this.measureLineHeights();
     measureAndApplyWordMasks(this.wordMeasurements, this.wordFadeWidth, this.lines);
     // 入场动画期间跳过 calculateLayout，避免 setPosition 瞬移破坏弹簧入场
-    if (!this.entranceComplete) {
-      this.needsFullSync = true;
-      return;
-    }
-    this.calculateLayout(true);
+    if (this.entranceComplete) this.calculateLayout(true);
     this.needsFullSync = true;
+    if (widthChanged) this.scheduleBalance(this.snapLayoutAfterEntrance);
   };
 
   /** 哨兵行尺寸变化（字体/样式变化时触发） */
@@ -1490,15 +1512,88 @@ export class LyricRenderer {
     }
     this.dotsContainerWidth = this.dotsContainer.offsetWidth || 60;
     this.dotsContainerHeight = this.dotsContainer.offsetHeight || 20;
+    clearLineBreaks(this.lineElements);
     this.measureLineHeights();
     measureAndApplyWordMasks(this.wordMeasurements, this.wordFadeWidth, this.lines);
     // 入场动画期间跳过 calculateLayout，避免 setPosition 瞬移破坏弹簧入场
-    if (!this.entranceComplete) {
-      this.needsFullSync = true;
-      return;
-    }
-    this.calculateLayout(true);
+    if (this.entranceComplete) this.calculateLayout(true);
     this.needsFullSync = true;
+    this.scheduleBalance(this.snapLayoutAfterEntrance);
+  };
+
+  /** 入场完成后瞬移重排，入场期间保持弹簧不被打断 */
+  private snapLayoutAfterEntrance = () => {
+    if (this.entranceComplete) this.calculateLayout(true);
+  };
+
+  /**
+   * 平衡换行：视口附近的行同步处理，其余按与激活行的距离分帧处理
+   * @param onVisibleChanged - 视口附近行高变化时的重排回调
+   */
+  private scheduleBalance = (onVisibleChanged: () => void) => {
+    cancelAnimationFrame(this.balanceRafId);
+    this.balanceRafId = 0;
+    this.balanceQueue = [];
+    this.balancePending = [];
+    if (!this.enableBalancedWrap) return;
+    const near: number[] = [];
+    const far: number[] = [];
+    const maxY = this.containerHeight + 500;
+    for (let i = 0; i < this.lineElements.length; i++) {
+      // 背景行随主行定位，当前位置或目标位置在裁剪带内即视为可见
+      const spring = this.positionSprings[this.lines[i]?.isBG ? i - 1 : i];
+      const y = spring?.getCurrentPosition() ?? 0;
+      const target = spring?.getTargetPosition() ?? 0;
+      const inView = (y >= -500 && y <= maxY) || (target >= -500 && target <= maxY);
+      (inView ? near : far).push(i);
+    }
+    // 视口附近行同步写入换行，行高留到下一帧校验，避免挂载时再强制布局一次
+    if (near.length > 0) balanceLineBreaks(near.map((i) => this.lineElements[i]));
+    this.balancePending = near;
+    this.balancePendingChanged = onVisibleChanged;
+    const anchor = Math.max(0, this.activeLineIndex);
+    far.sort((a, b) => Math.abs(a - anchor) - Math.abs(b - anchor));
+    this.balanceQueue = far;
+    this.balanceRafId = requestAnimationFrame(this.processBalanceQueue);
+  };
+
+  /** 分帧处理屏外行的平衡换行：先校验上一批行高，再写入下一批 */
+  private processBalanceQueue = () => {
+    this.balanceRafId = 0;
+    // 上一批换行已随上一帧完成布局，此时读取行高不会额外触发重排
+    if (this.syncLineHeights(this.balancePending)) this.balancePendingChanged();
+    const batch = this.balanceQueue.splice(0, BALANCE_BATCH_SIZE);
+    this.balancePending = batch;
+    this.balancePendingChanged = this.relayoutAfterBalance;
+    if (batch.length === 0) return;
+    balanceLineBreaks(batch.map((i) => this.lineElements[i]));
+    this.balanceRafId = requestAnimationFrame(this.processBalanceQueue);
+  };
+
+  /** 屏外行高变化后重排 */
+  private relayoutAfterBalance = () => this.calculateLayout(false, true);
+
+  /**
+   * 重测指定行的行高并写入缓存
+   * @param indices - 行下标
+   * @returns 行高是否变化
+   */
+  private syncLineHeights = (indices: number[]): boolean => {
+    let changed = false;
+    for (const i of indices) {
+      const height = this.lineElements[i]?.offsetHeight || 40;
+      if (height !== this.lineHeights[i]) {
+        this.lineHeights[i] = height;
+        changed = true;
+      }
+    }
+    // 哨兵行已在此重测，同步基准以免哨兵回调误判为样式变化
+    const sentinel = this.sentinelElement;
+    if (sentinel && indices.includes(0)) {
+      this.measuredSentinelWidth = sentinel.offsetWidth;
+      this.measuredSentinelHeight = sentinel.offsetHeight;
+    }
+    return changed;
   };
 
   /** 取 bottom-line 容器 */

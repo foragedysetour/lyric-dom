@@ -41,6 +41,7 @@ export interface DemoState extends Record<string, unknown> {
   enableFloatAnimation: boolean;
   enableEmphasizeEffect: boolean;
   enableScale: boolean;
+  enableBalancedWrap: boolean;
   showTranslation: boolean;
   showRomanization: boolean;
   showWordRomanization: boolean;
@@ -70,6 +71,7 @@ export const createInitialState = (): DemoState => ({
   enableFloatAnimation: DEFAULTS.enableFloatAnimation,
   enableEmphasizeEffect: DEFAULTS.enableEmphasizeEffect,
   enableScale: DEFAULTS.enableScale,
+  enableBalancedWrap: DEFAULTS.enableBalancedWrap,
   showTranslation: DEFAULTS.showTranslation,
   showRomanization: DEFAULTS.showRomanization,
   showWordRomanization: DEFAULTS.showWordRomanization,
@@ -146,6 +148,7 @@ export const CONTROL_DEFS: ControlDef<DemoState>[] = [
   { type: "group", label: "动效" },
   { key: "enableBlur", label: "逐行模糊", type: "toggle" },
   { key: "enableScale", label: "歌词缩放", type: "toggle" },
+  { key: "enableBalancedWrap", label: "平衡换行", type: "toggle" },
   { key: "enableFloatAnimation", label: "逐字上浮", type: "toggle" },
   { key: "enableEmphasizeEffect", label: "强调辉光", type: "toggle" },
   { type: "group", label: "文本与音标" },

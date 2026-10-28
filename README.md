@@ -141,6 +141,7 @@ Customize themes, font sizes, colors, and layout spacing through CSS custom prop
 | `showWordRomanization`  | `boolean`                  | `false`     | Whether to display per-word romanization (`romanWord`) under each word.                       |
 | `showRuby`              | `boolean`                  | `false`     | Whether to display in-word ruby annotations.                                                  |
 | `enableScale`           | `boolean`                  | `true`      | Whether inactive lines are slightly scaled down.                                              |
+| `enableBalancedWrap`    | `boolean`                  | `true`      | Balance wrapped lines to similar lengths, preferring breaks at punctuation, spaces and word boundaries (avoids a lone character on the last row). |
 | `bgAlwaysBelow`         | `boolean`                  | `false`     | Always place background vocal lines below their main line.                                    |
 | `enableScrollPreroll`   | `boolean`                  | `true`      | Whether to apply `applyScrollPreroll` internally to lyrics passed to `setLyrics`.             |
 | `scrollPrerollOptions`  | `Partial<ScrollPrerollOptions>` | `{}`   | Fine-tuning options for the internal scroll pre-roll.                                         |

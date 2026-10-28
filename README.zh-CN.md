@@ -141,6 +141,7 @@ bottomEl.textContent = "作词: ... / 作曲: ...";
 | `showWordRomanization` | `boolean` | `false` | 是否在每个单词下方显示逐字音译（`romanWord`）。 |
 | `showRuby` | `boolean` | `false` | 是否显示词内注音（ruby）。 |
 | `enableScale` | `boolean` | `true` | 是否让非激活行轻微缩小。 |
+| `enableBalancedWrap` | `boolean` | `true` | 是否对超长行做平衡换行：各行长度接近，优先在标点、空格、词边界处断开，避免末行只剩一个字。 |
 | `bgAlwaysBelow` | `boolean` | `false` | 是否始终将背景和声行置于主行下方。 |
 | `enableScrollPreroll` | `boolean` | `true` | 是否在 `setLyrics` 内部对歌词应用 `applyScrollPreroll`。 |
 | `scrollPrerollOptions` | `Partial<ScrollPrerollOptions>` | `{}` | 内部滚动预滚的微调参数。 |

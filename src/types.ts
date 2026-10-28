@@ -205,6 +205,11 @@ export interface RendererConfig {
    */
   enableScale: boolean;
   /**
+   * 是否对超长行做平衡换行（各行等长，优先在标点、空格、词边界处断开）
+   * @default true
+   */
+  enableBalancedWrap: boolean;
+  /**
    * 是否显示翻译歌词
    * @default true
    */
