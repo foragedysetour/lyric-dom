@@ -127,7 +127,7 @@ Customize themes, font sizes, colors, and layout spacing through CSS custom prop
 | `scrollResetDelay`      | `number`                   | `5000`      | Delay in milliseconds before auto-springing back after user manual scroll.                    |
 | `minInterludeGap`       | `number`                   | `4000`      | Minimum gap duration (ms) between lines to trigger interlude breathing dots.                  |
 | `breatheCycleTarget`    | `number`                   | `1500`      | Target breathing animation cycle duration (ms) for interlude dots.                            |
-| `alphaAttackSpeed`      | `number`                   | `50`        | Opacity transition attack speed when a line becomes active.                                   |
+| `alphaAttackSpeed`      | `number`                   | `16`        | Opacity transition attack speed when a line becomes active.                                   |
 | `alphaReleaseSpeed`     | `number`                   | `7`         | Opacity transition release speed when a line becomes inactive.                                |
 | `inactiveAlpha`         | `number`                   | `0.2`       | Base opacity for inactive lines.                                                              |
 | `hidePassedLines`       | `boolean`                  | `false`     | Whether to fade out already played lines.                                                     |

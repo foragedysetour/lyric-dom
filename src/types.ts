@@ -160,6 +160,16 @@ export interface RendererConfig {
    */
   inactiveAlpha: number;
   /**
+   * 行激活时的透明度爬升速度（1/s）
+   * @default 16
+   */
+  alphaAttackSpeed: number;
+  /**
+   * 行停用时的透明度衰减速度（1/s），非逐字歌词按其 1.5 倍作为二阶淡出的角频率
+   * @default 7
+   */
+  alphaReleaseSpeed: number;
+  /**
    * 是否隐藏已播放完毕的历史行
    * @default false
    */

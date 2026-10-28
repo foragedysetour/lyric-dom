@@ -175,6 +175,8 @@ export class LyricRenderer {
   private alphaAttackSpeed = DEFAULTS.alphaAttackSpeed;
   /** 透明度释放速度 */
   private alphaReleaseSpeed = DEFAULTS.alphaReleaseSpeed;
+  /** 非逐字歌词二阶淡出的透明度速度，与 alphaValues 同索引 */
+  private alphaVelocities = new Float64Array(0);
   /** 非激活行基础透明度 */
   private inactiveAlpha = DEFAULTS.inactiveAlpha;
   /** 是否隐藏已播放行 */
@@ -409,6 +411,7 @@ export class LyricRenderer {
 
     // 初始化透明度为非激活值
     this.alphaValues = new Float64Array(lineCount * 2);
+    this.alphaVelocities = new Float64Array(lineCount * 2);
     for (let i = 0; i < lineCount; i++) {
       this.alphaValues[i * 2] = this.inactiveAlpha;
       this.alphaValues[i * 2 + 1] = this.inactiveAlpha;
@@ -552,6 +555,8 @@ export class LyricRenderer {
     if (config.minInterludeGap != null) this.minInterludeGap = config.minInterludeGap;
     if (config.breatheCycleTarget != null) this.breatheCycleTarget = config.breatheCycleTarget;
     if (config.inactiveAlpha != null) this.inactiveAlpha = config.inactiveAlpha;
+    if (config.alphaAttackSpeed != null) this.alphaAttackSpeed = config.alphaAttackSpeed;
+    if (config.alphaReleaseSpeed != null) this.alphaReleaseSpeed = config.alphaReleaseSpeed;
     if (config.hidePassedLines != null) this.hidePassedLines = config.hidePassedLines;
     if (config.enableBlur != null) this.enableBlur = config.enableBlur;
     let domRebuildNeeded = false;
@@ -922,6 +927,8 @@ export class LyricRenderer {
       const dark = isPassed ? 0.0001 : this.enableWordHighlight ? this.inactiveAlpha : bright;
       this.alphaValues[i * 2] = bright;
       this.alphaValues[i * 2 + 1] = dark;
+      this.alphaVelocities[i * 2] = 0;
+      this.alphaVelocities[i * 2 + 1] = 0;
       const brightStr = bright.toFixed(3);
       const darkStr = dark.toFixed(3);
       const alphaKey = brightStr + darkStr;
@@ -1239,6 +1246,9 @@ export class LyricRenderer {
     const attackFactor = 1 - Math.exp(-this.alphaAttackSpeed * frameDeltaSec);
     const releaseFactor = 1 - Math.exp(-this.alphaReleaseSpeed * frameDeltaSec);
     const brightenFactor = this.hasWordTiming ? attackFactor : releaseFactor;
+    // 非逐字歌词变暗走二阶临界阻尼，起步平缓，避免上一行像被直接切掉
+    const smoothRelease = !this.hasWordTiming;
+    const releaseOmega = this.alphaReleaseSpeed * 1.5;
     const blurFactor = 1 - Math.exp(-12 * frameDeltaSec);
     const halfInactive = this.inactiveAlpha * 0.5;
     const doPass = this.hidePassedLines && this.isPlaying;
@@ -1264,7 +1274,11 @@ export class LyricRenderer {
       let brightValue = prevBright;
       if (Math.abs(targetBright - brightValue) < 0.001) {
         brightValue = targetBright;
+        this.alphaVelocities[alphaIdx] = 0;
+      } else if (smoothRelease && targetBright < brightValue) {
+        brightValue = this.stepCriticalAlpha(alphaIdx, targetBright, releaseOmega, frameDeltaSec);
       } else {
+        this.alphaVelocities[alphaIdx] = 0;
         const factor =
           !isPassed && brightValue < halfInactive
             ? releaseFactor
@@ -1284,7 +1298,11 @@ export class LyricRenderer {
       let darkValue = prevDark;
       if (Math.abs(targetDark - darkValue) < 0.001) {
         darkValue = targetDark;
+        this.alphaVelocities[alphaIdx + 1] = 0;
+      } else if (smoothRelease && targetDark < darkValue) {
+        darkValue = this.stepCriticalAlpha(alphaIdx + 1, targetDark, releaseOmega, frameDeltaSec);
       } else {
+        this.alphaVelocities[alphaIdx + 1] = 0;
         const factor =
           !isPassed && darkValue < halfInactive
             ? releaseFactor
@@ -1506,6 +1524,23 @@ export class LyricRenderer {
     // 检测到跳变则瞬移布局，避免旧歌词行残留
     this.snapNextSeek = true;
     this.needsFullSync = true;
+  };
+
+  /**
+   * 按临界阻尼解析解推进一帧透明度，并更新对应速度
+   * @param idx - alphaValues 索引
+   * @param target - 目标透明度
+   * @param omega - 自然角频率（1/s）
+   * @param dt - 帧间隔（s）
+   * @returns 推进后的透明度
+   */
+  private stepCriticalAlpha = (idx: number, target: number, omega: number, dt: number) => {
+    const offset = this.alphaValues[idx] - target;
+    const velocity = this.alphaVelocities[idx];
+    const decay = Math.exp(-omega * dt);
+    const drift = (velocity + omega * offset) * dt;
+    this.alphaVelocities[idx] = (velocity - omega * drift) * decay;
+    return target + (offset + drift) * decay;
   };
 
   /** 将当前弹簧参数应用到位置弹簧 */

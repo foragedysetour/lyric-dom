@@ -127,7 +127,7 @@ bottomEl.textContent = "作词: ... / 作曲: ...";
 | `scrollResetDelay` | `number` | `5000` | 用户手动滚动后，自动回弹至激活行的延迟时间（毫秒）。 |
 | `minInterludeGap` | `number` | `4000` | 触发间奏呼吸圆点动画的最小空白时长（毫秒）。 |
 | `breatheCycleTarget` | `number` | `1500` | 间奏圆点呼吸动画的目标周期时长（毫秒）。 |
-| `alphaAttackSpeed` | `number` | `50` | 行激活时的透明度爬升速度。 |
+| `alphaAttackSpeed` | `number` | `16` | 行激活时的透明度爬升速度。 |
 | `alphaReleaseSpeed` | `number` | `7` | 行停用时的透明度衰减速度。 |
 | `inactiveAlpha` | `number` | `0.2` | 非激活行的基础透明度。 |
 | `hidePassedLines` | `boolean` | `false` | 是否淡出已播放完毕的历史歌词行。 |
