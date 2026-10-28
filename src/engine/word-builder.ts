@@ -370,16 +370,11 @@ export const measureAndApplyWordMasks = (
         ? `clamp(${startPos}px,calc(${startPos}px + (var(--t,${lineStart}) - ${adjustedStart}) * ${speed}px),${endPos}px) 0px,left top`
         : `${startPos}px 0px,left top`;
       const style = measurement.element.style;
-      style.setProperty("-webkit-mask-image", maskImage);
-      style.setProperty("-webkit-mask-size", maskSize);
-      style.setProperty("-webkit-mask-repeat", "no-repeat");
-      style.setProperty("-webkit-mask-position", maskPosition);
-      style.removeProperty("-webkit-mask-composite");
+      // 仅写标准 mask 属性，与静态行一致
       style.setProperty("mask-image", maskImage);
       style.setProperty("mask-size", maskSize);
       style.setProperty("mask-repeat", "no-repeat");
       style.setProperty("mask-position", maskPosition);
-      style.removeProperty("mask-composite");
     }
   }
 };

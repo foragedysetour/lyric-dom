@@ -137,6 +137,8 @@ export class LyricRenderer {
 
   /** transform 写入缓存 */
   private cachedTransforms: string[] = [];
+  /** 生成 transform 缓存串时的位置与缩放（i*2 为位置，i*2+1 为缩放），NaN 表示无效 */
+  private cachedTransformInputs = new Float64Array(0);
   private lineWillChange: boolean[] = [];
   /** 视口裁剪标记 */
   private lineCulled: boolean[] = [];
@@ -218,6 +220,9 @@ export class LyricRenderer {
   private sentinelResizeObserver: ResizeObserver;
   /** 哨兵行元素 */
   private sentinelElement: HTMLDivElement | null = null;
+  /** 最近一次行高测量时哨兵行的尺寸，-1 表示需在下次哨兵回调时强制重测 */
+  private measuredSentinelWidth = -1;
+  private measuredSentinelHeight = -1;
 
   /** bottom-line 容器 */
   private bottomLineEl!: HTMLDivElement;
@@ -293,6 +298,8 @@ export class LyricRenderer {
     if (this.animationFrameId !== 0) return;
     this.containerResizeObserver.observe(this.container);
     if (this.sentinelElement) {
+      // 冻结期间样式可能变化，恢复后的哨兵初始回调强制重测
+      this.measuredSentinelWidth = -1;
       this.sentinelResizeObserver.observe(this.sentinelElement);
     }
     this.lastFrameTimestamp = 0;
@@ -412,6 +419,8 @@ export class LyricRenderer {
     this.bgExpandValues = new Float64Array(lineCount);
     this.cachedBgKeys = new Array(lineCount).fill("");
     this.cachedTransforms = new Array(lineCount).fill("");
+    this.cachedTimeString = "";
+    this.cachedTransformInputs = new Float64Array(lineCount * 2).fill(Number.NaN);
     this.lineWillChange = new Array(lineCount).fill(false);
     this.lineCulled = new Array(lineCount).fill(false);
     this.cachedAlphaKeys = new Array(lineCount).fill("");
@@ -706,8 +715,11 @@ export class LyricRenderer {
     // 重新测量行高并计算掩码
     this.measureLineHeights();
     measureAndApplyWordMasks(this.wordMeasurements, this.wordFadeWidth, this.lines);
+    // 保留哨兵初始回调的瞬移对齐
+    this.measuredSentinelWidth = -1;
     // 清理缓存并将当前弹簧物理坐标即时写回新 DOM，杜绝白屏与位置跳变
     this.cachedTransforms.fill("");
+    this.cachedTransformInputs.fill(Number.NaN);
     this.cachedAlphaKeys.fill("");
     this.cachedBlurKeys.fill("");
     this.cachedBgKeys.fill("");
@@ -756,6 +768,9 @@ export class LyricRenderer {
     for (let i = 0; i < this.lineElements.length; i++) {
       this.lineHeights[i] = this.lineElements[i]?.offsetHeight || 40;
     }
+    const sentinel = this.sentinelElement;
+    this.measuredSentinelWidth = sentinel ? sentinel.offsetWidth : -1;
+    this.measuredSentinelHeight = sentinel ? sentinel.offsetHeight : -1;
   };
 
   /**
@@ -1157,11 +1172,22 @@ export class LyricRenderer {
           this.lineCulled[i] = true;
           const culledTransform = `translateY(${yPos.toFixed(1)}px) scale(${scale.toFixed(4)})`;
           this.cachedTransforms[i] = culledTransform;
+          this.cachedTransformInputs[i * 2] = yPos;
+          this.cachedTransformInputs[i * 2 + 1] = scale;
           this.lineElements[i].style.transform = culledTransform;
         }
         continue;
       }
       this.lineCulled[i] = false;
+      // 位置与缩放未变时缓存串必然相同，跳过字符串拼接
+      if (
+        this.cachedTransformInputs[i * 2] === yPos &&
+        this.cachedTransformInputs[i * 2 + 1] === scale
+      ) {
+        continue;
+      }
+      this.cachedTransformInputs[i * 2] = yPos;
+      this.cachedTransformInputs[i * 2 + 1] = scale;
       const transformStr = `translateY(${yPos.toFixed(1)}px) scale(${scale.toFixed(4)})`;
       if (this.cachedTransforms[i] !== transformStr) {
         this.cachedTransforms[i] = transformStr;
@@ -1234,7 +1260,8 @@ export class LyricRenderer {
       // alpha：亮色（--ba）和暗色（--da）分别插值
       const alphaIdx = i * 2;
       const targetBright = isPassed ? 0.0001 : isActive ? 1.0 : this.inactiveAlpha;
-      let brightValue = this.alphaValues[alphaIdx];
+      const prevBright = this.alphaValues[alphaIdx];
+      let brightValue = prevBright;
       if (Math.abs(targetBright - brightValue) < 0.001) {
         brightValue = targetBright;
       } else {
@@ -1253,7 +1280,8 @@ export class LyricRenderer {
         : this.enableWordHighlight
           ? this.inactiveAlpha
           : targetBright;
-      let darkValue = this.alphaValues[alphaIdx + 1];
+      const prevDark = this.alphaValues[alphaIdx + 1];
+      let darkValue = prevDark;
       if (Math.abs(targetDark - darkValue) < 0.001) {
         darkValue = targetDark;
       } else {
@@ -1267,15 +1295,17 @@ export class LyricRenderer {
       }
       this.alphaValues[alphaIdx + 1] = darkValue;
 
-      // 缓存对比，仅变化时写入 DOM
-      const brightStr = brightValue.toFixed(3);
-      const darkStr = darkValue.toFixed(3);
-      const alphaKey = brightStr + darkStr;
-      if (this.cachedAlphaKeys[i] !== alphaKey) {
-        this.cachedAlphaKeys[i] = alphaKey;
-        const lineEl = this.lineElements[i];
-        lineEl.style.setProperty("--ba", brightStr);
-        lineEl.style.setProperty("--da", darkStr);
+      // 缓存对比，仅变化时写入 DOM；数值未变且已有缓存时跳过字符串拼接
+      if (brightValue !== prevBright || darkValue !== prevDark || this.cachedAlphaKeys[i] === "") {
+        const brightStr = brightValue.toFixed(3);
+        const darkStr = darkValue.toFixed(3);
+        const alphaKey = brightStr + darkStr;
+        if (this.cachedAlphaKeys[i] !== alphaKey) {
+          this.cachedAlphaKeys[i] = alphaKey;
+          const lineEl = this.lineElements[i];
+          lineEl.style.setProperty("--ba", brightStr);
+          lineEl.style.setProperty("--da", darkStr);
+        }
       }
 
       // blur：逐行模糊，距激活行越远越模糊
@@ -1430,6 +1460,16 @@ export class LyricRenderer {
   /** 哨兵行尺寸变化（字体/样式变化时触发） */
   private handleSentinelResize = () => {
     if (this.lineElements.length === 0) return;
+    // 尺寸与最近一次测量一致（observe 初始回调、容器回调已在同帧重测）时跳过重复测量
+    const sentinel = this.sentinelElement;
+    if (
+      sentinel &&
+      sentinel.offsetWidth === this.measuredSentinelWidth &&
+      sentinel.offsetHeight === this.measuredSentinelHeight
+    ) {
+      this.needsFullSync = true;
+      return;
+    }
     this.dotsContainerWidth = this.dotsContainer.offsetWidth || 60;
     this.dotsContainerHeight = this.dotsContainer.offsetHeight || 20;
     this.measureLineHeights();
