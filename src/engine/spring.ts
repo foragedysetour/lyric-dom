@@ -179,6 +179,7 @@ export class Spring {
       this.pendingParams.time -= deltaMs;
       if (this.pendingParams.time <= 0) {
         const { time: _, ...springParams } = this.pendingParams;
+        this.pendingParams = undefined;
         this.updateParams(springParams);
       }
     }
@@ -208,7 +209,6 @@ export class Spring {
       };
       this.settled = false;
     } else {
-      this.pendingPosition = undefined;
       this.params = { ...this.params, ...params };
       this.rebuildSolver();
     }

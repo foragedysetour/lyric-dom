@@ -536,7 +536,7 @@ export class LyricRenderer {
     }
     if (config.onLineClick !== undefined) this.lineClickCallback = config.onLineClick ?? null;
     if (config.springConfig) {
-      this.springParams = config.springConfig;
+      this.springParams = { ...this.springParams, ...config.springConfig };
       this.applySpringParams();
     }
     if (config.scrollResetDelay != null) this.scrollResetDelay = config.scrollResetDelay;
@@ -1450,9 +1450,7 @@ export class LyricRenderer {
   private handleVisibilityChange = () => {
     this.isPageVisible = !document.hidden;
     if (!this.isPageVisible) return;
-    if (this.animationFrameId === 0) return;
-    this.lastFrameTimestamp = 0;
-    // 隐藏期间缓冲的歌词此刻应用，内部完成测量、布局与动画清理
+    // 隐藏期间缓冲的歌词此刻应用，冻结中也要应用，内部完成测量、布局与动画清理
     if (this.pendingHiddenLyrics) {
       const pendingLines = this.pendingHiddenLyrics;
       this.pendingHiddenLyrics = null;
@@ -1460,6 +1458,8 @@ export class LyricRenderer {
       this.snapNextSeek = true;
       return;
     }
+    if (this.animationFrameId === 0) return;
+    this.lastFrameTimestamp = 0;
     this.lineAnimations.cleanupInactive();
     this.measureLineHeights();
     if (this.entranceComplete) this.calculateLayout(true);
