@@ -573,7 +573,11 @@ export class LyricRenderer {
     if (config.alphaAttackSpeed != null) this.alphaAttackSpeed = config.alphaAttackSpeed;
     if (config.alphaReleaseSpeed != null) this.alphaReleaseSpeed = config.alphaReleaseSpeed;
     if (config.hidePassedLines != null) this.hidePassedLines = config.hidePassedLines;
-    if (config.enableBlur != null) this.enableBlur = config.enableBlur;
+    if (config.enableBlur != null && config.enableBlur !== this.enableBlur) {
+      this.enableBlur = config.enableBlur;
+      // 视口内行下一帧按新值重写 will-change
+      this.lineWillChange.fill(false);
+    }
     let domRebuildNeeded = false;
     let needPrerollUpdate = false;
 
@@ -767,7 +771,7 @@ export class LyricRenderer {
       const inView = y >= -500 && y <= this.containerHeight + 500;
       this.lineWillChange[i] = inView;
       this.lineCulled[i] = false;
-      lineEl.style.willChange = inView ? "transform, filter" : "";
+      lineEl.style.willChange = inView ? this.lineWillChangeValue() : "";
       // 同步模糊缓存与样式
       const blur = this.blurValues[i] || 0;
       if (blur > 0.01) {
@@ -1192,7 +1196,7 @@ export class LyricRenderer {
       // 合成层按需提升：仅视口附近的行挂 will-change
       if (this.lineWillChange[i] !== inView) {
         this.lineWillChange[i] = inView;
-        this.lineElements[i].style.willChange = inView ? "transform, filter" : "";
+        this.lineElements[i].style.willChange = inView ? this.lineWillChangeValue() : "";
       }
       // 视口裁剪：屏幕外行跳过 transform 写入
       if (!isFullSync && !inView) {
@@ -1232,7 +1236,7 @@ export class LyricRenderer {
       const bottomInView = bottomY >= -500 && bottomY <= viewHeight + 500;
       if (this.bottomWillChange !== bottomInView) {
         this.bottomWillChange = bottomInView;
-        this.bottomLineEl.style.willChange = bottomInView ? "transform, filter" : "";
+        this.bottomLineEl.style.willChange = bottomInView ? "transform" : "";
       }
       if (!isFullSync && !bottomInView) {
         // 同歌词行：离带首帧写一次终位，防止 DOM 残留在视口内
@@ -1496,6 +1500,14 @@ export class LyricRenderer {
     this.needsFullSync = true;
     if (widthChanged) this.scheduleBalance(this.snapLayoutAfterEntrance);
   };
+
+  /**
+   * 行元素的 will-change 值，仅启用模糊时声明 filter
+   * @returns will-change 取值
+   */
+  private lineWillChangeValue(): string {
+    return this.enableBlur ? "transform, filter" : "transform";
+  }
 
   /** 哨兵行尺寸变化（字体/样式变化时触发） */
   private handleSentinelResize = () => {

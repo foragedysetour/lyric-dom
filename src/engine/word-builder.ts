@@ -369,6 +369,9 @@ export const measureAndApplyWordMasks = (
       const maskPosition = Number.isFinite(speed)
         ? `clamp(${startPos}px,calc(${startPos}px + (var(--t,${lineStart}) - ${adjustedStart}) * ${speed}px),${endPos}px) 0px,left top`
         : `${startPos}px 0px,left top`;
+      const maskKey = maskImage + maskSize + maskPosition;
+      if (measurement.maskKey === maskKey) continue;
+      measurement.maskKey = maskKey;
       const style = measurement.element.style;
       // 仅写标准 mask 属性，与静态行一致
       style.setProperty("mask-image", maskImage);

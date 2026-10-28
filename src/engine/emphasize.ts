@@ -14,6 +14,23 @@ const MIN_GLOW_STRENGTH = 0.16;
 /** 辉光强度上限，避免长音产生过大的重绘区域 */
 const MAX_GLOW_STRENGTH = 0.72;
 
+/** 按字符节点缓存的辉光关键帧，参数键一致时复用 */
+const glowFrameCache = new WeakMap<HTMLElement, { key: string; frames: Keyframe[] }>();
+/**
+ * 生成正弦上浮关键帧
+ * @param amplitude - 上浮幅度倍数
+ * @returns 上浮关键帧
+ */
+const buildFloatFrames = (amplitude: number): Keyframe[] =>
+  Array.from({ length: FRAME_COUNT }, (_, frameIndex) => {
+    const progress = (frameIndex + 1) / FRAME_COUNT;
+    const height = Math.sin(progress * Math.PI) * amplitude;
+    return { offset: progress, transform: `translateY(${-height * 0.043}em)` };
+  });
+/** 上浮关键帧仅取决于是否背景人声 */
+const MAIN_FLOAT_FRAMES = buildFloatFrames(1);
+const BG_FLOAT_FRAMES = buildFloatFrames(2);
+
 /** 将数值限制在 0 到 1 之间 */
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
@@ -106,21 +123,28 @@ export const createEmphasizeAnimations = (
   for (let index = 0; index < characterElements.length; index++) {
     const element = characterElements[index];
     const characterDelay = safeDelay + (safeDuration / 2.5 / characterCount) * index;
-    const glowFrames: Keyframe[] = Array.from({ length: FRAME_COUNT }, (_, frameIndex) => {
-      const progress = (frameIndex + 1) / FRAME_COUNT;
-      const eased = emphasisEasing(progress);
-      const scale = 1 + eased * 0.085 * amount;
-      const offsetX = -eased * 0.024 * amount * (characterCount / 2 - index);
-      const offsetY = -eased * 0.02 * amount;
-      const glowAlpha = eased * blur;
-      const innerRadius = Math.min(0.16, 0.035 + blur * 0.12);
-      const outerRadius = Math.min(0.28, 0.08 + blur * 0.2);
-      return {
-        offset: progress,
-        transform: `${scaleMatrix3d(scale)} translate(${offsetX}em, ${offsetY}em)`,
-        textShadow: `0 0 ${innerRadius}em rgba(255, 255, 255, ${glowAlpha}), 0 0 ${outerRadius}em rgba(255, 255, 255, ${glowAlpha * 0.45})`,
-      };
-    });
+    const glowKey = `${amount},${blur},${characterCount},${index}`;
+    const cachedGlow = glowFrameCache.get(element);
+    const glowFrames: Keyframe[] =
+      cachedGlow?.key === glowKey
+        ? cachedGlow.frames
+        : Array.from({ length: FRAME_COUNT }, (_, frameIndex) => {
+            const progress = (frameIndex + 1) / FRAME_COUNT;
+            const eased = emphasisEasing(progress);
+            const scale = 1 + eased * 0.085 * amount;
+            const offsetX = -eased * 0.024 * amount * (characterCount / 2 - index);
+            const offsetY = -eased * 0.02 * amount;
+            const glowAlpha = eased * blur;
+            const innerRadius = Math.min(0.16, 0.035 + blur * 0.12);
+            const outerRadius = Math.min(0.28, 0.08 + blur * 0.2);
+            return {
+              offset: progress,
+              transform: `${scaleMatrix3d(scale)} translate(${offsetX}em, ${offsetY}em)`,
+              textShadow: `0 0 ${innerRadius}em rgba(255, 255, 255, ${glowAlpha}), 0 0 ${outerRadius}em rgba(255, 255, 255, ${glowAlpha * 0.45})`,
+            };
+          });
+    if (cachedGlow?.frames !== glowFrames)
+      glowFrameCache.set(element, { key: glowKey, frames: glowFrames });
     const glow = element.animate(glowFrames, {
       duration: safeDuration,
       delay: Number.isFinite(characterDelay) ? characterDelay : 0,
@@ -132,11 +156,7 @@ export const createEmphasizeAnimations = (
     glow.pause();
     animations.push(glow);
 
-    const floatFrames: Keyframe[] = Array.from({ length: FRAME_COUNT }, (_, frameIndex) => {
-      const progress = (frameIndex + 1) / FRAME_COUNT;
-      const height = Math.sin(progress * Math.PI) * (isBG ? 2 : 1);
-      return { offset: progress, transform: `translateY(${-height * 0.043}em)` };
-    });
+    const floatFrames = isBG ? BG_FLOAT_FRAMES : MAIN_FLOAT_FRAMES;
     const float = element.animate(floatFrames, {
       duration: safeDuration * 1.4,
       delay: Number.isFinite(characterDelay) ? characterDelay - 400 : 0,

@@ -71,7 +71,7 @@ describe("setConfig 原地热更新 (In-place Hot Update)", () => {
     // 新 DOM 必须重新获得真实的合成层提示，不能沿用旧节点的 lineWillChange 缓存。
     expect(engine.lineElements[0]).not.toBe(oldLineElement);
     expect(engine.lineWillChange[0]).toBe(true);
-    expect(engine.lineElements[0]?.style.willChange).toBe("transform, filter");
+    expect(engine.lineElements[0]?.style.willChange).toBe("transform");
 
     renderer.dispose();
   });

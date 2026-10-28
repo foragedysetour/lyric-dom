@@ -265,6 +265,8 @@ export interface WordMeasurement {
   width: number;
   /** 遮罩渐变区域宽度（像素） */
   fadeWidth: number;
+  /** 最近一次写入的遮罩样式键，未变化时跳过写入 */
+  maskKey?: string;
 }
 
 /** 单词动画渲染目标描述（供 Web Animations API 懒创建） */

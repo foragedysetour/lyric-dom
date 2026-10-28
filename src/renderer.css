@@ -47,7 +47,7 @@
 
 /* 带背景副行的主行：允许浮层越过行盒边界、承接副行展开量 */
 .lp-line.has-bg {
-  contain: none;
+  contain: layout style;
 }
 
 /* 背景副行浮层：嵌在主行盒上/下方，占主行组内独立插槽
