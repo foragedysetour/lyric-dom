@@ -14,7 +14,6 @@ import { parseLyricFile } from "./importer";
 import { buildPanel } from "./panel";
 import { DemoPlayer } from "./player";
 import "../src/renderer.css";
-import "./style.css";
 
 // ---- DOM 元素 ----
 const container = document.getElementById("lyrics-container") as HTMLDivElement;
@@ -317,6 +316,7 @@ btnReset?.addEventListener("click", () => {
     enableBlur: state.enableBlur,
     enableFloatAnimation: state.enableFloatAnimation,
     enableEmphasizeEffect: state.enableEmphasizeEffect,
+    enableScale: state.enableScale,
     showTranslation: state.showTranslation,
     showRomanization: state.showRomanization,
     showWordRomanization: state.showWordRomanization,

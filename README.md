@@ -23,7 +23,7 @@ npm install lyric-dom
 Import the renderer class along with its stylesheet:
 
 ```ts
-import { LyricRenderer, applyScrollPreroll } from "lyric-dom";
+import { LyricRenderer } from "lyric-dom";
 import "lyric-dom/renderer.css";
 
 const container = document.querySelector<HTMLDivElement>("#lyrics")!;
@@ -36,13 +36,15 @@ const renderer = new LyricRenderer(container, {
   },
 });
 
-// Pass lyric lines (applyScrollPreroll smoothly advances scroll timing before line singing starts)
-renderer.setLyrics(applyScrollPreroll(lines));
+// Pass raw lyric lines; scroll pre-roll is applied internally (enableScrollPreroll, on by default)
+renderer.setLyrics(lines);
 ```
+
+> The container must have an explicit height: `.lp-root` uses `contain: strict`, so an auto-height container collapses to 0.
 
 ### Playback Synchronization
 
-Push playback progress on each animation frame or audio `timeupdate` event:
+Push playback progress on every animation frame (`requestAnimationFrame`). The audio `timeupdate` event fires only about 4 times per second, which makes the word-by-word sweep stutter:
 
 ```ts
 // Update playback progress (milliseconds)
@@ -62,6 +64,7 @@ renderer.freeze();
 renderer.resume();
 
 // Destroy renderer instance and clean up DOM and listeners
+// (call it before creating a new renderer on the same container, otherwise the old render loop keeps running)
 renderer.dispose();
 ```
 
@@ -135,6 +138,14 @@ Customize themes, font sizes, colors, and layout spacing through CSS custom prop
 | `emphasizeMinDuration`  | `number`                   | `1000`      | Minimum note duration in milliseconds required for emphasis.                                 |
 | `showTranslation`       | `boolean`                  | `true`      | Whether to display translated lyrics.                                                         |
 | `showRomanization`      | `boolean`                  | `true`      | Whether to display romanized lyrics.                                                          |
+| `showWordRomanization`  | `boolean`                  | `false`     | Whether to display per-word romanization (`romanWord`) under each word.                       |
+| `showRuby`              | `boolean`                  | `false`     | Whether to display in-word ruby annotations.                                                  |
+| `enableScale`           | `boolean`                  | `true`      | Whether inactive lines are slightly scaled down.                                              |
+| `bgAlwaysBelow`         | `boolean`                  | `false`     | Always place background vocal lines below their main line.                                    |
+| `enableScrollPreroll`   | `boolean`                  | `true`      | Whether to apply `applyScrollPreroll` internally to lyrics passed to `setLyrics`.             |
+| `scrollPrerollOptions`  | `Partial<ScrollPrerollOptions>` | `{}`   | Fine-tuning options for the internal scroll pre-roll.                                         |
+| `seekBackwardThreshold` | `number`                   | `100`       | Backward time jump (ms) recognized as a seek.                                                 |
+| `seekForwardThreshold`  | `number`                   | `2000`      | Forward time jump (ms) recognized as a seek.                                                  |
 | `onLineClick`           | `(timeMs: number) => void` | `undefined` | Callback invoked when clicking a lyric line, receiving line start time in ms.                 |
 
 ### `SpringParams`
@@ -143,16 +154,16 @@ Spring animation parameters based on damped harmonic oscillator physics:
 
 | Parameter   | Type      | Default | Description                                                                                |
 | :---------- | :-------- | :------ | :----------------------------------------------------------------------------------------- |
-| `mass`      | `number`  | `1`     | Mass of the simulated object. Higher values yield greater inertia and slower acceleration. |
-| `damping`   | `number`  | `10`    | Friction/damping coefficient controlling oscillation decay rate.                           |
-| `stiffness` | `number`  | `100`   | Spring stiffness. Higher values snap to target faster.                                     |
+| `mass`      | `number`  | `0.9`   | Mass of the simulated object. Higher values yield greater inertia and slower acceleration. |
+| `damping`   | `number`  | `15`    | Friction/damping coefficient controlling oscillation decay rate.                           |
+| `stiffness` | `number`  | `90`    | Spring stiffness. Higher values snap to target faster.                                     |
 | `soft`      | `boolean` | `false` | When `true`, forces over-damped mode (pure exponential decay without bounce).              |
 
 ### Utilities
 
 #### `applyScrollPreroll(lines)`
 
-Pre-rolls line start times so that the view scrolls into place before each line begins singing:
+Pre-rolls line start times so that the view scrolls into place before each line begins singing. The renderer already applies it when `enableScrollPreroll` is `true` (default); call it yourself only with `enableScrollPreroll: false`, otherwise lines are pre-rolled twice:
 
 - Non-overlapping lines are advanced by up to 600 ms.
 - Overlapping lines are capped at 400 ms or 30% of the preceding line's duration.
@@ -160,6 +171,7 @@ Pre-rolls line start times so that the view scrolls into place before each line 
 ```ts
 import { applyScrollPreroll } from "lyric-dom";
 
+renderer.setConfig({ enableScrollPreroll: false });
 renderer.setLyrics(applyScrollPreroll(rawLines));
 ```
 

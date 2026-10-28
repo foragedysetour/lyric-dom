@@ -129,7 +129,7 @@ export interface RendererConfig {
   alignment: LyricAlignment;
   /**
    * 播放状态
-   * @default false
+   * @default true
    */
   playing: boolean;
   /** 自定义弹簧动力学参数 */

@@ -23,7 +23,7 @@ npm install lyric-dom
 导入渲染器类与样式表：
 
 ```ts
-import { LyricRenderer, applyScrollPreroll } from "lyric-dom";
+import { LyricRenderer } from "lyric-dom";
 import "lyric-dom/renderer.css";
 
 const container = document.querySelector<HTMLDivElement>("#lyrics")!;
@@ -36,13 +36,15 @@ const renderer = new LyricRenderer(container, {
   },
 });
 
-// 设置歌词数据（applyScrollPreroll 会在开唱前适当提前行滚动时机，使视野切换更平滑自然）
-renderer.setLyrics(applyScrollPreroll(lines));
+// 直接传入原始歌词；滚动预滚由渲染器内部完成（enableScrollPreroll，默认开启）
+renderer.setLyrics(lines);
 ```
+
+> 容器必须有明确高度：`.lp-root` 使用 `contain: strict`，高度自适应的容器会塌陷为 0。
 
 ### 播放同步与进度控制
 
-在每帧动画循环或音频 `timeupdate` 事件中推送当前播放进度：
+在每帧动画循环（`requestAnimationFrame`）中推送当前播放进度。音频 `timeupdate` 事件每秒只触发约 4 次，会导致逐字扫光卡顿：
 
 ```ts
 // 推送当前播放进度（毫秒）
@@ -62,6 +64,7 @@ renderer.freeze();
 renderer.resume();
 
 // 销毁渲染器实例，清理 DOM 节点、动画与事件监听器
+//（在同一容器上新建渲染器前须先调用，否则旧实例的渲染循环会一直运行）
 renderer.dispose();
 ```
 
@@ -135,6 +138,14 @@ bottomEl.textContent = "作词: ... / 作曲: ...";
 | `emphasizeMinDuration` | `number` | `1000` | 触发强调辉光所需的最短音节时长（毫秒）。 |
 | `showTranslation` | `boolean` | `true` | 是否显示翻译歌词行。 |
 | `showRomanization` | `boolean` | `true` | 是否显示罗马音歌词行。 |
+| `showWordRomanization` | `boolean` | `false` | 是否在每个单词下方显示逐字音译（`romanWord`）。 |
+| `showRuby` | `boolean` | `false` | 是否显示词内注音（ruby）。 |
+| `enableScale` | `boolean` | `true` | 是否让非激活行轻微缩小。 |
+| `bgAlwaysBelow` | `boolean` | `false` | 是否始终将背景和声行置于主行下方。 |
+| `enableScrollPreroll` | `boolean` | `true` | 是否在 `setLyrics` 内部对歌词应用 `applyScrollPreroll`。 |
+| `scrollPrerollOptions` | `Partial<ScrollPrerollOptions>` | `{}` | 内部滚动预滚的微调参数。 |
+| `seekBackwardThreshold` | `number` | `100` | 识别为跳转（seek）的后退时间阈值（毫秒）。 |
+| `seekForwardThreshold` | `number` | `2000` | 识别为跳转（seek）的前进时间阈值（毫秒）。 |
 | `onLineClick` | `(timeMs: number) => void` | `undefined` | 点击歌词行时的回调函数，参数为该行的起始时间戳（毫秒）。 |
 
 ### `SpringParams`
@@ -143,16 +154,16 @@ bottomEl.textContent = "作词: ... / 作曲: ...";
 
 | 参数 | 类型 | 默认值 | 说明 |
 | :--- | :--- | :--- | :--- |
-| `mass` | `number` | `1` | 模拟物体的质量。数值越大惯性越大，加速与振荡越迟钝。 |
-| `damping` | `number` | `10` | 摩擦阻尼系数。控制振荡衰减的快慢程度。 |
-| `stiffness` | `number` | `100` | 弹簧刚度（回弹力强度）。数值越大回弹到目标位置越迅速。 |
+| `mass` | `number` | `0.9` | 模拟物体的质量。数值越大惯性越大，加速与振荡越迟钝。 |
+| `damping` | `number` | `15` | 摩擦阻尼系数。控制振荡衰减的快慢程度。 |
+| `stiffness` | `number` | `90` | 弹簧刚度（回弹力强度）。数值越大回弹到目标位置越迅速。 |
 | `soft` | `boolean` | `false` | 为 `true` 时强制启用过阻尼模式（无任何回弹振荡，单调指数衰减）。 |
 
 ### 工具函数与常量
 
 #### `applyScrollPreroll(lines)`
 
-提前歌词行的起始时间，使滚动渲染器能够在演唱开始前平滑地将视野滚动就位：
+提前歌词行的起始时间，使滚动渲染器能够在演唱开始前平滑地将视野滚动就位。`enableScrollPreroll` 为 `true`（默认）时渲染器内部已经应用，只有关闭它时才需要手动调用，否则会被预滚两次：
 
 - 无时间重叠的行最高提前 600 ms。
 - 存在重叠的对唱行提前量限制在 400 ms 或前一行时长的 30% 以内。
@@ -160,6 +171,7 @@ bottomEl.textContent = "作词: ... / 作曲: ...";
 ```ts
 import { applyScrollPreroll } from "lyric-dom";
 
+renderer.setConfig({ enableScrollPreroll: false });
 renderer.setLyrics(applyScrollPreroll(rawLines));
 ```
 

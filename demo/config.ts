@@ -119,17 +119,6 @@ export const clearSavedState = (): void => {
   }
 };
 
-export const REBUILD_KEYS = new Set([
-  "enableFloatAnimation",
-  "enableEmphasizeEffect",
-  "showTranslation",
-  "showRomanization",
-  "showWordRomanization",
-  "showRuby",
-  "bgAlwaysBelow",
-  "enableScrollPreroll",
-]);
-
 export const CONTROL_DEFS: ControlDef<DemoState>[] = [
   { type: "group", label: "布局与字号" },
   { key: "fontSize", label: "字体大小(px)", type: "range", min: 16, max: 64, step: 1 },
