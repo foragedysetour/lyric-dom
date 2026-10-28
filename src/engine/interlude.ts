@@ -154,7 +154,7 @@ export const renderInterludeDots = (
   const origin =
     state.align === "right" ? "right center" : state.align === "center" ? "center" : "left center";
   const transformStr = `translate(${state.x.toFixed(1)}px,${state.y.toFixed(1)}px) scale(${scale.toFixed(4)})`;
-  const styleKey = transformStr + origin;
+  const styleKey = transformStr + origin + opacity;
   if (cache.containerStyle !== styleKey) {
     cache.containerStyle = styleKey;
     dotsContainer.style.opacity = String(opacity);

@@ -32,7 +32,6 @@
   font-size: var(--lp-font-size, inherit);
   font-weight: inherit;
   transform-origin: left;
-  opacity: 1;
   contain: content;
   pointer-events: none;
   --ba: 0.2;
@@ -253,11 +252,11 @@
   --lp-duet-indent: 15%;
 }
 
-.lp-has-duet .lp-line:not(.bg):not(.duet) {
+.lp-has-duet .lp-line:not(.duet) {
   padding-inline-end: var(--lp-duet-indent);
 }
 
-.lp-has-duet .lp-line.duet:not(.bg) {
+.lp-has-duet .lp-line.duet {
   padding-inline-start: var(--lp-duet-indent);
 }
 
@@ -324,7 +323,7 @@
 /* ---- 悬停交互 ---- */
 
 @media (hover: hover) and (pointer: fine) {
-  .lp-line:not(.bg) .lp-content {
+  .lp-line .lp-content {
     cursor: pointer;
     pointer-events: auto;
 

@@ -113,7 +113,7 @@ Customize themes, font sizes, colors, and layout spacing through CSS custom prop
 | `freeze()`               | -                                 | Suspend requestAnimationFrame loop and disconnect resize observers.                                |
 | `resume()`               | -                                 | Resume requestAnimationFrame loop, re-observe dimensions, and resync animations.                   |
 | `getBottomLineElement()` | -                                 | Returns the bottom container element (`.lp-credit`) located below the last lyric line.             |
-| `dispose()`              | -                                 | Destroy the renderer instance, cancel animations, and remove all event listeners and DOM elements. |
+| `dispose()`              | -                                 | Destroy the renderer instance, cancel animations, and remove all event listeners and DOM elements. Call it before creating a new renderer on the same container, otherwise the old instance's animation loop keeps running. |
 
 ### `RendererConfig`
 

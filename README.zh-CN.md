@@ -113,7 +113,7 @@ bottomEl.textContent = "作词: ... / 作曲: ...";
 | `freeze()` | - | 挂起 requestAnimationFrame 渲染循环并断开尺寸监听（节省后台资源）。 |
 | `resume()` | - | 恢复 requestAnimationFrame 渲染循环、重新监听尺寸并对齐动画状态。 |
 | `getBottomLineElement()` | - | 获取位于最末行歌词下方的底部容器元素（`.lp-credit`）。 |
-| `dispose()` | - | 彻底销毁渲染器实例，终止所有动画并清理 DOM 节点与事件监听器。 |
+| `dispose()` | - | 彻底销毁渲染器实例，终止所有动画并清理 DOM 节点与事件监听器。在同一容器上重新创建渲染器前必须先调用，否则旧实例的动画循环会一直运行。 |
 
 ### `RendererConfig`
 

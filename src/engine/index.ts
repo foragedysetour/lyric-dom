@@ -26,6 +26,8 @@ import {
   type WordMeasurement,
 } from "./word-builder";
 
+/** 滚轮按行滚动时每行对应的像素 */
+const WHEEL_LINE_HEIGHT = 16;
 /** 屏外行平衡换行每帧处理的行数，每次重排有固定开销，宜大批少次 */
 const BALANCE_BATCH_SIZE = 32;
 
@@ -727,6 +729,7 @@ export class LyricRenderer {
     this.lineAnimTargets = built.lineAnimTargets;
     this.isBgAbove = built.isBgAbove;
     this.innerElement.appendChild(built.fragment);
+    this.innerElement.appendChild(this.bottomLineEl);
     // 恢复对唱标记与当前激活行的 active 类与 Web Animations
     this.container.classList.toggle(
       "lp-has-duet",
@@ -1443,9 +1446,20 @@ export class LyricRenderer {
     }, this.scrollResetDelay);
   };
 
+  /**
+   * 滚轮滚动歌词
+   * @param event - 滚轮事件
+   */
   private handleWheel = (event: WheelEvent) => {
     event.preventDefault();
-    this.applyUserScroll(event.deltaY);
+    // 行/页单位换算为像素，像素单位保持原值
+    const unit =
+      event.deltaMode === 1
+        ? WHEEL_LINE_HEIGHT
+        : event.deltaMode === 2
+          ? this.containerHeight || WHEEL_LINE_HEIGHT
+          : 1;
+    this.applyUserScroll(event.deltaY * unit);
   };
 
   private handleTouchStart = (event: TouchEvent) => {

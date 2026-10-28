@@ -6,7 +6,7 @@
       "!dist",
       "!demo/dist",
       "!node_modules",
-      "package-lock.json",
+      "!package-lock.json",
       "!pnpm-lock.yaml",
       "!**/package.json"
     ]
